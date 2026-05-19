@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#0d0d0d"/>
+  <title>Multi-LLM Chat</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/icon-192.png"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg0: #0d0d0d; --bg1: #141414; --bg2: #1c1c1c; --bg3: #252525;
+      --border: rgba(255,255,255,0.08); --border-s: rgba(255,255,255,0.15);
+      --text0: #f0f0f0; --text1: #a0a0a0; --text2: #505050;
+    }
+    html, body { width:100%; height:100%; overflow:hidden; background:var(--bg0); }
+    body { font-family: -apple-system, 'Helvetica Neue', sans-serif; color:var(--text0); display:flex; flex-direction:column; }
+
+    /* HEADER */
+    #header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding: env(safe-area-inset-top, 12px) 16px 12px;
+      padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+      background:var(--bg1); border-bottom:0.5px solid var(--border);
+      flex-shrink:0; min-height:54px;
+    }
+    #header-left { display:flex; align-items:center; gap:8px; }
+    #header-logo { width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#9d96f5,#f07a5a); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    #header-title { font-size:15px; font-weight:600; letter-spacing:-0.3px; }
+    #btn-settings-top { width:36px; height:36px; border-radius:10px; border:none; background:var(--bg2); color:var(--text1); font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+
+    /* MODELS BAR */
+    #models-bar { display:flex; gap:6px; padding:10px 12px; overflow-x:auto; background:var(--bg0); border-bottom:0.5px solid var(--border); flex-shrink:0; scrollbar-width:none; }
+    #models-bar::-webkit-scrollbar { display:none; }
+    .model-chip {
+      display:flex; align-items:center; gap:5px; padding:5px 10px;
+      border-radius:99px; font-size:12px; font-weight:500;
+      border:0.5px solid; white-space:nowrap; cursor:pointer;
+      transition:opacity 0.15s; flex-shrink:0; user-select:none;
+    }
+    .model-chip.off { opacity:0.3; }
+    .chip-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .chip-claude  { color:#9d96f5; border-color:#9d96f5; background:rgba(157,150,245,0.12); }
+    .chip-gpt     { color:#6dbf7e; border-color:#6dbf7e; background:rgba(109,191,126,0.12); }
+    .chip-gemini  { color:#f5a623; border-color:#f5a623; background:rgba(245,166,35,0.12); }
+    .chip-grok    { color:#c084fc; border-color:#c084fc; background:rgba(192,132,252,0.12); }
+    .chip-llama   { color:#f07a5a; border-color:#f07a5a; background:rgba(240,122,90,0.12); }
+    .chip-llama8b { color:#34d399; border-color:#34d399; background:rgba(52,211,153,0.12); }
+    .chip-qwen    { color:#60a5fa; border-color:#60a5fa; background:rgba(96,165,250,0.12); }
+    .chip-mistral { color:#fb923c; border-color:#fb923c; background:rgba(251,146,60,0.12); }
+
+    /* MESSAGES */
+    #messages { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px; -webkit-overflow-scrolling:touch; }
+    .msg-group { display:flex; flex-direction:column; gap:2px; max-width:85%; }
+    .msg-group.human-group { align-self:flex-end; align-items:flex-end; }
+    .msg-group.ai-group    { align-self:flex-start; align-items:flex-start; }
+    .msg-meta { font-size:10px; color:var(--text2); padding:0 4px; display:flex; align-items:center; gap:4px; }
+    .meta-dot { width:5px; height:5px; border-radius:50%; }
+    .bubble { padding:9px 13px; border-radius:16px; font-size:14px; line-height:1.55; border:0.5px solid var(--border); background:var(--bg1); word-break:break-word; }
+    .bubble.human   { background:rgba(90,171,240,0.12);  border-color:rgba(90,171,240,0.25);  color:#aad4f5; border-bottom-right-radius:4px; }
+    .bubble.ai-msg  { border-bottom-left-radius:4px; }
+    .bubble.claude  { background:rgba(157,150,245,0.1); border-color:rgba(157,150,245,0.2); color:#d4d0ff; }
+    .bubble.gpt     { background:rgba(109,191,126,0.1); border-color:rgba(109,191,126,0.2); color:#b8e8c3; }
+    .bubble.gemini  { background:rgba(245,166,35,0.1);  border-color:rgba(245,166,35,0.2);  color:#f5d88a; }
+    .bubble.grok    { background:rgba(192,132,252,0.1); border-color:rgba(192,132,252,0.2); color:#e9d5ff; }
+    .bubble.llama   { background:rgba(240,122,90,0.1);  border-color:rgba(240,122,90,0.2);  color:#f5b8a5; }
+    .bubble.llama8b { background:rgba(52,211,153,0.1);  border-color:rgba(52,211,153,0.2);  color:#a7f3d0; }
+    .bubble.qwen    { background:rgba(96,165,250,0.1);  border-color:rgba(96,165,250,0.2);  color:#bfdbfe; }
+    .bubble.mistral { background:rgba(251,146,60,0.1);  border-color:rgba(251,146,60,0.2);  color:#fed7aa; }
+    .bubble.system  { background:transparent; border-color:var(--border); color:var(--text2); font-size:12px; font-style:italic; align-self:center; text-align:center; max-width:100%; border-radius:8px; }
+    .typing-bubble  { padding:9px 13px; border-radius:16px; border-bottom-left-radius:4px; border:0.5px solid var(--border); background:var(--bg1); display:flex; align-items:center; gap:4px; }
+    .td { width:5px; height:5px; border-radius:50%; background:var(--text2); animation:tdB 1s infinite; }
+    .td:nth-child(2){animation-delay:0.15s} .td:nth-child(3){animation-delay:0.3s}
+    @keyframes tdB { 0%,80%,100%{transform:scale(0.6);opacity:0.3} 40%{transform:scale(1);opacity:0.8} }
+
+    /* INPUT */
+    #input-area {
+      display:flex; gap:8px; align-items:flex-end;
+      padding:10px 12px;
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+      border-top:0.5px solid var(--border); background:var(--bg0);
+    }
+    #msg-input { flex:1; font-family:inherit; font-size:15px; padding:10px 13px; background:var(--bg1); border:0.5px solid var(--border); border-radius:20px; color:var(--text0); resize:none; min-height:42px; max-height:120px; line-height:1.4; outline:none; }
+    #msg-input::placeholder { color:var(--text2); }
+    #send-btn { width:42px; height:42px; border-radius:50%; border:none; background:#5aabf0; color:#fff; font-size:20px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; transition:background 0.12s; }
+    #send-btn:disabled { background:var(--bg3); color:var(--text2); }
+
+    /* SETTINGS SHEET */
+    #settings-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; display:none; }
+    #settings-sheet {
+      position:fixed; bottom:0; left:0; right:0; z-index:51;
+      background:var(--bg1); border-radius:20px 20px 0 0;
+      padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 20px);
+      max-height:85vh; overflow-y:auto; display:none;
+      transform:translateY(100%); transition:transform 0.3s ease;
+    }
+    #settings-sheet.open { display:block; transform:translateY(0); }
+    #settings-backdrop.open { display:block; }
+    .sheet-handle { width:36px; height:4px; background:var(--border-s); border-radius:2px; margin:0 auto 16px; }
+    .sheet-title { font-size:16px; font-weight:600; margin-bottom:16px; }
+    .sheet-section { font-size:10px; letter-spacing:0.12em; color:var(--text2); text-transform:uppercase; margin:14px 0 8px; }
+    .sheet-group { display:flex; flex-direction:column; gap:10px; }
+    .key-row { display:flex; flex-direction:column; gap:4px; }
+    .key-label { font-size:12px; color:var(--text1); display:flex; align-items:center; gap:6px; }
+    .key-dot { width:7px; height:7px; border-radius:50%; background:var(--bg3); flex-shrink:0; }
+    .key-dot.ok { background:#34d399; } .key-dot.err { background:#f07a5a; }
+    .key-input { font-family:inherit; font-size:13px; padding:10px 12px; background:var(--bg2); border:0.5px solid var(--border); border-radius:10px; color:var(--text0); outline:none; width:100%; }
+    .key-hint { font-size:11px; color:var(--text2); }
+    .sheet-divider { border:none; border-top:0.5px solid var(--border); margin:8px 0; }
+    .name-input { font-family:inherit; font-size:15px; padding:10px 12px; background:var(--bg2); border:0.5px solid var(--border); border-radius:10px; color:var(--text0); outline:none; width:100%; }
+    .sheet-btn { width:100%; padding:13px; font-family:inherit; font-size:15px; font-weight:600; background:#5aabf0; color:#fff; border:none; border-radius:12px; cursor:pointer; margin-top:16px; }
+    .sheet-btn-clear { width:100%; padding:12px; font-family:inherit; font-size:14px; background:transparent; color:var(--text1); border:0.5px solid var(--border); border-radius:12px; cursor:pointer; margin-top:8px; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div id="header-left">
+    <div id="header-logo">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="6" r="2.5" fill="white" opacity="0.9"/>
+        <path d="M4 10 Q3.5 14 4 15.5 Q6 17 9 17 Q12 17 14 15.5 Q14.5 14 14 10 Q12 8.5 9 8.5 Q6 8.5 4 10Z" fill="white" opacity="0.9"/>
+      </svg>
+    </div>
+    <span id="header-title">Multi-LLM Chat</span>
+  </div>
+  <button id="btn-settings-top">⚙</button>
+</div>
+
+<div id="models-bar">
+  <div class="model-chip chip-claude on" data-model="claude"><div class="chip-dot" style="background:#9d96f5"></div>Claude</div>
+  <div class="model-chip chip-gpt on"    data-model="gpt">   <div class="chip-dot" style="background:#6dbf7e"></div>GPT-4o</div>
+  <div class="model-chip chip-gemini on" data-model="gemini"><div class="chip-dot" style="background:#f5a623"></div>Gemini</div>
+  <div class="model-chip chip-grok on"   data-model="grok">  <div class="chip-dot" style="background:#c084fc"></div>Grok</div>
+  <div class="model-chip chip-llama on"  data-model="llama"> <div class="chip-dot" style="background:#f07a5a"></div>Llama 3</div>
+  <div class="model-chip chip-llama8b on" data-model="llama8b"><div class="chip-dot" style="background:#34d399"></div>Llama 8B</div>
+  <div class="model-chip chip-qwen on"   data-model="qwen">  <div class="chip-dot" style="background:#60a5fa"></div>Qwen 3</div>
+  <div class="model-chip chip-mistral on" data-model="mistral"><div class="chip-dot" style="background:#fb923c"></div>Mistral</div>
+</div>
+
+<div id="messages">
+  <div class="msg-group ai-group"><div class="bubble system">Sala abierta. Activa los modelos y enviá un mensaje.</div></div>
+</div>
+
+<div id="input-area">
+  <textarea id="msg-input" placeholder="Mensaje..." rows="1"></textarea>
+  <button id="send-btn">↑</button>
+</div>
+
+<div id="settings-backdrop"></div>
+<div id="settings-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Configuración</div>
+
+  <div class="key-row">
+    <label class="key-label">Tu nombre</label>
+    <input class="name-input" id="name-input" type="text" value="Usuario" maxlength="24"/>
+  </div>
+
+  <div class="sheet-section">API Keys gratuitas</div>
+  <div class="sheet-group">
+    <div class="key-row">
+      <label class="key-label"><div class="key-dot" id="dot-groq"></div>Groq — Llama + Qwen (gratis)</label>
+      <input class="key-input" id="key-groq" type="password" placeholder="gsk_..."/>
+      <span class="key-hint">console.groq.com</span>
+    </div>
+    <div class="key-row">
+      <label class="key-label"><div class="key-dot" id="dot-mistral"></div>Mistral (gratis)</label>
+      <input class="key-input" id="key-mistral" type="password" placeholder="..."/>
+      <span class="key-hint">console.mistral.ai</span>
+    </div>
+    <div class="key-row">
+      <label class="key-label"><div class="key-dot" id="dot-gemini"></div>Google Gemini (gratis según región)</label>
+      <input class="key-input" id="key-gemini" type="password" placeholder="AIza..."/>
+      <span class="key-hint">aistudio.google.com</span>
+    </div>
+  </div>
+
+  <hr class="sheet-divider"/>
+  <div class="sheet-section">API Keys de pago</div>
+  <div class="sheet-group">
+    <div class="key-row">
+      <label class="key-label"><div class="key-dot" id="dot-anthropic"></div>Anthropic — Claude</label>
+      <input class="key-input" id="key-anthropic" type="password" placeholder="sk-ant-..."/>
+      <span class="key-hint">console.anthropic.com</span>
+    </div>
+    <div class="key-row">
+      <label class="key-label"><div class="key-dot" id="dot-openai"></div>OpenAI — GPT-4o</label>
+      <input class="key-input" id="key-openai" type="password" placeholder="sk-..."/>
+      <span class="key-hint">platform.openai.com</span>
+    </div>
+    <div class="key-row">
+      <label class="key-label"><div class="key-dot" id="dot-xai"></div>xAI — Grok</label>
+      <input class="key-input" id="key-xai" type="password" placeholder="xai-..."/>
+      <span class="key-hint">console.x.ai</span>
+    </div>
+  </div>
+
+  <button class="sheet-btn" id="btn-save">Guardar</button>
+  <button class="sheet-btn-clear" id="btn-clear">Limpiar chat</button>
+</div>
+
+<script>
+const AI_META = {
+  claude:  { label:'Claude',    color:'#9d96f5', keyField:'anthropic' },
+  gpt:     { label:'GPT-4o',   color:'#6dbf7e', keyField:'openai' },
+  gemini:  { label:'Gemini',   color:'#f5a623', keyField:'google' },
+  grok:    { label:'Grok',     color:'#c084fc', keyField:'xai' },
+  llama:   { label:'Llama 3',  color:'#f07a5a', keyField:'groq' },
+  llama8b: { label:'Llama 8B', color:'#34d399', keyField:'groq' },
+  qwen:    { label:'Qwen 3',   color:'#60a5fa', keyField:'groq' },
+  mistral: { label:'Mistral',  color:'#fb923c', keyField:'mistral' },
+}
+const STAGGER = { claude:0, gpt:150, gemini:300, grok:450, llama:600, llama8b:750, qwen:900, mistral:1050 }
+const SYSTEMS = {
+  claude:  'Sos Claude de Anthropic en una sala de chat grupal con otros LLMs y humanos. Respondé natural y conciso (2-4 oraciones). Respondé en el idioma del humano.',
+  gpt:     'Sos GPT-4o de OpenAI en una sala de chat grupal con otros LLMs y humanos. Sos directo y preciso (2-4 oraciones). Respondé en el idioma del humano.',
+  gemini:  'Sos Gemini de Google en una sala de chat grupal con otros LLMs y humanos. Sos curioso y creativo (2-4 oraciones). Respondé en el idioma del humano.',
+  grok:    'Sos Grok de xAI en una sala de chat grupal con otros LLMs y humanos. Sos directo e ingenioso (2-4 oraciones). Respondé en el idioma del humano.',
+  llama:   'Sos Llama 3 de Meta en una sala de chat grupal con otros LLMs y humanos. Sos pragmático y defensor del open source (2-4 oraciones). Respondé en el idioma del humano.',
+  llama8b: 'Sos Llama 3.1 8B de Meta en una sala de chat grupal con otros LLMs y humanos. Sos rápido y conciso (2-3 oraciones). Respondé en el idioma del humano.',
+  qwen:    'Sos Qwen 3 de Alibaba en una sala de chat grupal con otros LLMs y humanos. Sos analítico y pensás paso a paso (2-4 oraciones). Respondé en el idioma del humano.',
+  mistral: 'Sos Mistral de Mistral AI en una sala de chat grupal con otros LLMs y humanos. Sos eficiente y europeo en perspectiva (2-4 oraciones). Respondé en el idioma del humano.',
+}
+
+const activeModels = Object.fromEntries(Object.keys(AI_META).map(k => [k, true]))
+const history = []
+let keys = {}
+let userName = 'Usuario'
+
+function loadKeys() {
+  try { keys = JSON.parse(localStorage.getItem('llm-keys') || '{}') } catch {}
+  userName = localStorage.getItem('llm-name') || 'Usuario'
+  document.getElementById('name-input').value = userName
+  document.getElementById('key-groq').value     = keys.groq     || ''
+  document.getElementById('key-mistral').value  = keys.mistral  || ''
+  document.getElementById('key-gemini').value   = keys.google   || ''
+  document.getElementById('key-anthropic').value= keys.anthropic|| ''
+  document.getElementById('key-openai').value   = keys.openai   || ''
+  document.getElementById('key-xai').value      = keys.xai      || ''
+  updateDots()
+}
+
+function updateDots() {
+  const s = (id, val) => { const e = document.getElementById(id); if(e){ e.classList.toggle('ok',!!val); e.classList.toggle('err',!val) } }
+  s('dot-groq',     keys.groq)
+  s('dot-mistral',  keys.mistral)
+  s('dot-gemini',   keys.google)
+  s('dot-anthropic',keys.anthropic)
+  s('dot-openai',   keys.openai)
+  s('dot-xai',      keys.xai)
+}
+
+document.querySelectorAll('.model-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const m = chip.dataset.model
+    activeModels[m] = !activeModels[m]
+    chip.classList.toggle('off', !activeModels[m])
+  })
+})
+
+const sheet = document.getElementById('settings-sheet')
+const backdrop = document.getElementById('settings-backdrop')
+document.getElementById('btn-settings-top').onclick = () => { sheet.classList.add('open'); backdrop.classList.add('open') }
+backdrop.onclick = () => { sheet.classList.remove('open'); backdrop.classList.remove('open') }
+document.getElementById('btn-save').onclick = () => {
+  keys = {
+    groq:      document.getElementById('key-groq').value.trim(),
+    mistral:   document.getElementById('key-mistral').value.trim(),
+    google:    document.getElementById('key-gemini').value.trim(),
+    anthropic: document.getElementById('key-anthropic').value.trim(),
+    openai:    document.getElementById('key-openai').value.trim(),
+    xai:       document.getElementById('key-xai').value.trim(),
+  }
+  userName = document.getElementById('name-input').value.trim() || 'Usuario'
+  localStorage.setItem('llm-keys', JSON.stringify(keys))
+  localStorage.setItem('llm-name', userName)
+  updateDots()
+  sheet.classList.remove('open'); backdrop.classList.remove('open')
+  addSystemMsg('Configuración guardada.')
+}
+document.getElementById('btn-clear').onclick = () => {
+  history.length = 0
+  document.getElementById('messages').innerHTML = ''
+  addSystemMsg('Chat limpiado.')
+  sheet.classList.remove('open'); backdrop.classList.remove('open')
+}
+
+const messagesDiv = document.getElementById('messages')
+const scrollBottom = () => messagesDiv.scrollTop = messagesDiv.scrollHeight
+
+function addSystemMsg(text) {
+  const g = document.createElement('div'); g.className = 'msg-group ai-group'
+  const b = document.createElement('div'); b.className = 'bubble system'; b.textContent = text
+  g.appendChild(b); messagesDiv.appendChild(g); scrollBottom()
+}
+function addHumanMsg(text) {
+  const g = document.createElement('div'); g.className = 'msg-group human-group'
+  const m = document.createElement('div'); m.className = 'msg-meta'; m.style.justifyContent = 'flex-end'
+  m.innerHTML = `<span class="meta-dot" style="background:#5aabf0"></span> ${userName}`
+  const b = document.createElement('div'); b.className = 'bubble human'; b.textContent = text
+  g.appendChild(m); g.appendChild(b); messagesDiv.appendChild(g); scrollBottom()
+}
+function addAIMsg(model, text) {
+  const cfg = AI_META[model]
+  const g = document.createElement('div'); g.className = 'msg-group ai-group'
+  const m = document.createElement('div'); m.className = 'msg-meta'
+  m.innerHTML = `<span class="meta-dot" style="background:${cfg.color}"></span> ${cfg.label}`
+  const b = document.createElement('div'); b.className = `bubble ai-msg ${model}`; b.textContent = text
+  g.appendChild(m); g.appendChild(b); messagesDiv.appendChild(g); scrollBottom()
+}
+function addTyping(model) {
+  const cfg = AI_META[model]
+  const g = document.createElement('div'); g.className = 'msg-group ai-group'; g.id = `typing-${model}`
+  const m = document.createElement('div'); m.className = 'msg-meta'
+  m.innerHTML = `<span class="meta-dot" style="background:${cfg.color}"></span> ${cfg.label}`
+  const ind = document.createElement('div'); ind.className = 'typing-bubble'
+  ind.innerHTML = '<div class="td"></div><div class="td"></div><div class="td"></div>'
+  g.appendChild(m); g.appendChild(ind); messagesDiv.appendChild(g); scrollBottom()
+}
+function removeTyping(model) { const e = document.getElementById(`typing-${model}`); if(e) e.remove() }
+
+async function callModel(model, text) {
+  const cfg = AI_META[model]
+  const apiKey = keys[cfg.keyField]
+  if (!apiKey) return `⚠ Falta la API key. Abrí Configuración.`
+  const msgs = history.slice(-12).map(h => ({ role: h.role, content: h.role === 'assistant' ? `[${h.label}]: ${h.content}` : h.content }))
+  msgs.push({ role: 'user', content: text })
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: msgs, system: SYSTEMS[model], keys })
+  })
+  const data = await res.json()
+  if (data.error) throw new Error(data.error)
+  return data.reply
+}
+
+async function handleSend() {
+  const input = document.getElementById('msg-input')
+  const text = input.value.trim()
+  if (!text) return
+  const activeList = Object.keys(activeModels).filter(k => activeModels[k])
+  if (!activeList.length) { addSystemMsg('Activá al menos un modelo.'); return }
+  input.value = ''; input.style.height = 'auto'
+  document.getElementById('send-btn').disabled = true
+  addHumanMsg(text)
+  history.push({ role: 'user', content: text })
+  await Promise.all(activeList.map(async (model) => {
+    await new Promise(r => setTimeout(r, STAGGER[model] || 0))
+    addTyping(model)
+    try {
+      const reply = await callModel(model, text)
+      removeTyping(model)
+      addAIMsg(model, reply)
+      history.push({ role: 'assistant', content: reply, label: AI_META[model].label })
+    } catch(err) {
+      removeTyping(model)
+      addAIMsg(model, `Error: ${err.message}`)
+    }
+  }))
+  document.getElementById('send-btn').disabled = false
+  input.focus()
+}
+
+document.getElementById('send-btn').onclick = handleSend
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+})
+document.getElementById('msg-input').addEventListener('input', function() {
+  this.style.height = 'auto'
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px'
+})
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
+loadKeys()
+</script>
+</body>
+</html>
